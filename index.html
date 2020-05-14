@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Arcade</title>
+    <style>
+      html, body { margin: 0; padding: 0; overflow: hidden; }
+    </style>
+  </head>
+  <body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser-ce/2.12.0/phaser.js"></script>
+    <script>
+var game = new Phaser.Game(1280, 720, Phaser.AUTO, 'phaser-example', { preload: preload, create: create, update: update, render: render });
+
+function preload() {
+
+//Jugador
+game.load.spritesheet('dude', 'sheet_hero_complete2.png', 128,128);
+//Moneda
+game.load.spritesheet('coin','moneda.png', 32, 32);
+//Enemigo serpiente
+game.load.spritesheet('enemysnak','sheet_snake_walk2.png', 128,128);
+
+game.load.image('piso', 'piso.png');
+//Bala
+game.load.spritesheet('fire', 'fuego3.png', 64,64);
+//game.load.image('fire','fuego.png');
+game.load.image('background','background.jpg')
+game.load.tilemap('map', 'tt.csv', null, Phaser.Tilemap.CSV);
+game.load.image('tiles', 'Tiles_128x128.png');
+game.load.image('fondo','background.jpg');
+game.load.image('fondo2','mountains-back.png');
+game.load.image('fondo3','mountains-mid1.png');
+game.load.image('fondo4','mountains-mid2.png');
+//La music
+game.load.audio('musicprinci', ['Guardians Inferno (From Guardians of the Galaxy Vol. 2Audio Only).mp3']);
+//Sonido moneda
+game.load.audio('coinsound', ['monedasound.mp3']);
+//Snake kill sound
+game.load.audio('killsnake', ['snakesounds.mp3']);
+//Final sound
+game.load.audio('win', ['wining.mp3']);
+//Perdida
+game.load.audio('lose', ['lose.wav']);
+
+}
+
+//Varibles lindas
+//Jugador, plataformas y monedas
+var player;
+var coins;
+var facing = 'left';
+var ori = false;
+var finalcoin;
+
+//Para el mapa
+var map;
+var layer;
+var cursors;
+
+//Enemigo
+var enemysnake;
+ 
+//Puntaje
+var text;
+var record = 0;
+ 
+//Crear balas
+var bullets;
+var bulletTime = 0;
+
+//Para la música
+var musicprin;
+
+//Efectos
+var coinsoundd;
+var killsnakes;
+var winn;
+var losee;
+
+//Para fondo
+var bg;
+var bg2;
+var bg3;
+var bg4;
+
+//tiempo animacion
+var time_animator=0
+
+var dis=false
+var move=false
+
+
+var piso;
+
+var tiempo_acha=0
+
+function create() {
+
+//
+bg = game.add.tileSprite(0,0,1280,720,'fondo');
+bg.fixedToCamera = true;
+
+bg2 = game.add.tileSprite(0, 
+            550+game.height - game.cache.getImage('fondo2').height, 
+            game.width+12800, 
+            game.cache.getImage('fondo2').height, 
+            'fondo2'
+        );
+bg2.position.x=-720;
+bg3 = game.add.tileSprite(0, 
+            550+game.height - game.cache.getImage('fondo3').height, 
+            game.width+12800, 
+            game.cache.getImage('fondo3').height, 
+            'fondo3'
+        );
+bg4 = game.add.tileSprite(0, 
+            550+game.height - game.cache.getImage('fondo4').height, 
+            game.width+12800, 
+            game.cache.getImage('fondo4').height, 
+            'fondo4'
+        );
+//bg2.setScrollFactor(0);
+//game.world.setBounds(0, 0, game.config.width,game.config.width);
+//bg2.fixedToCamera = false;
+
+//Crear jugador
+player = game.add.sprite(0,0,'dude');
+//Fisicas de jugador
+game.physics.arcade.enable(player);
+//Gravedad
+player.body.gravity.y = 600;
+player.body.collideWorldBounds = true;
+
+piso= game.add.physicsGroup();
+
+//Para la musica
+musicprin = game.add.audio('musicprinci');
+musicprin.play();
+
+//Sonido de kill serpiente
+killsnakes = game.add.audio('killsnake');
+
+//Sonido de perdida
+losee = game.add.audio('lose');
+
+//Sonido efecto final
+winn = game.add.audio('win');
+
+//Efectos
+coinsoundd = game.add.audio('coinsound');
+
+//Snake kill sound
+game.load.audio('killsnake', ['snakesounds.mp3']);
+
+//Fondo
+game.stage.backgroundColor = '#182d3b';
+
+//Animaciones jugador
+player.animations.add('left', [48, 49, 50, 51, 52, 53, 54, 55], 10, true);
+player.animations.add('turn', [0], 20, true);
+player.animations.add('right', [8, 9, 10, 11, 12, 13, 14, 15], 12, true);
+
+player.animations.add('leftt_dis', [64, 65, 66, 67, 68, 69, 70, 71], 10, true);
+player.animations.add('rightt_dis', [24, 25, 26, 27, 28, 29, 30, 31], 12, true);
+
+player.animations.add('idle_right', [0, 1, 2, 3, 4], 12, true);
+player.animations.add('idle_left', [ 43, 44, 45, 46, 47], 12, true);
+player.animations.add('idle_left_dis', [ 59,60,61,62,63], 12, true);
+player.animations.add('idle_right_dis', [ 16,17,18,19,20], 12, true);
+player.animations.add('jump_right', [32, 33, 34], 2, true);
+player.animations.add('jump_left', [ 77, 78, 79], 2, true);
+
+//Balas
+bullets = game.add.group();
+bullets.enableBody = true;
+bullets.physicsBodyType = Phaser.Physics.ARCADE;
+for (var i = 0; i < 20; i++){
+var b = bullets.create(0, 0, 'fire');
+b.name = 'fire' + i;
+b.exists = false;
+b.visible = false;
+b.checkWorldBounds = true;
+b.events.onOutOfBounds.add(resetBullet, this);
+}
+
+bullets.callAll('animations.add', 'animations', 'spin', [0, 1, 2, 3, 4, 5, 6, 7], 10, true);
+bullets.callAll('animations.play', 'animations', 'spin');
+
+//Animacion enemigo
+enemysnake = game.add.physicsGroup();
+
+//Coins
+coins = game.add.physicsGroup();
+coins.setAll('body.immovable',true);
+
+//Coins
+finalcoin = game.add.physicsGroup();
+finalcoin.setAll('body.immovable',true);
+
+
+//  Because we're loading CSV map data we have to specify the tile size here or we can't render it
+map = game.add.tilemap('map', 128, 128);
+
+//  Now add in the tileset
+map.addTilesetImage('tiles');
+
+//  Create our layer
+layer = map.createLayer(0);
+
+//  Resize the world
+layer.resizeWorld();
+
+//  Declarar colicion
+map.setCollisionBetween(0, 5);
+map.setCollisionBetween(7, 10);
+map.setCollisionBetween(14, 27);
+map.setCollisionBetween(29, 33);
+
+//Remplazar monedas
+map.createFromTiles(50, -1, 'coin', layer, coins);
+
+//Remplazar monedas
+map.createFromTiles(6, -1, 'piso', layer, piso);
+
+
+//Remplazar enemigos
+map.createFromTiles(51, -1, 'enemysnak', layer, enemysnake);
+enemysnake.setAll('body.gravity.y', 700);
+enemysnake.setAll('body.velocity.x', -10);
+
+//  Add animations to all of the coin sprites
+coins.callAll('animations.add', 'animations', 'spin', [0, 1, 2, 3, 4, 5], 10, true);
+coins.callAll('animations.play', 'animations', 'spin');
+
+//  Add animations to all of the enemy sprites
+enemysnake.callAll('animations.add', 'animations', 'spin', [0, 1, 2, 3, 4, 5, 6], 10, true);
+enemysnake.callAll('animations.play', 'animations', 'spin');
+
+//Control con el teclado
+cursors = game.input.keyboard.createCursorKeys();
+jumpButton = game.input.keyboard.addKey(Phaser.Keyboard.UP);
+game.input.keyboard.addKeyCapture([ Phaser.Keyboard.SPACEBAR ]);
+
+//Seguir jugador
+game.world.setBounds(0, 0, 76500, 1250);
+game.camera.follow(player);
+
+//Puntaje
+var style = { font: "bold 32px Arial", fill: "#fff", boundsAlignH: "center", boundsAlignV: "middle" };
+//  The Text is positioned at 0, 100
+text = game.add.text(0, 0, "Puntaje: 0", style);
+text.fixedToCamera = true;
+
+
+
+piso.setAll('body.immovable', false);
+
+
+}
+
+function update() {
+ 
+//Muerte por caida
+if(player.position.y > 1100){
+record = 0;
+game.state.restart();
+}
+
+game.physics.arcade.collide(player, piso);
+//piso.velocity.x=0
+//Fisica platoforma jugador
+game.physics.arcade.collide( player, layer );
+
+//Fisica platoforma enenygo
+game.physics.arcade.collide( enemysnake, layer );
+
+//Fisica jugador
+player.body.velocity.x = 0;
+
+//Recoger monedas
+game.physics.arcade.overlap(player, coins, collectcoin, null, this);
+
+//Para amatar enemigo
+kill1enemy = game.physics.arcade.overlap(bullets, enemysnake, killenemy, null, this);
+//Jugador muerto
+game.physics.arcade.overlap(player, enemysnake, killplayer, null, this);
+
+//b.angle += 1;
+//bullets.rotation=tiempo_acha*0.0001;
+
+//tiempo_acha++
+
+//Animacion y despasamiento derecha
+if (cursors.right.isDown){
+player.body.velocity.x = 250;
+bg.tilePosition.x -= 0.01; 
+bg2.tilePosition.x -= 0.05; 
+bg3.tilePosition.x -= 0.3; 
+bg4.tilePosition.x -= 0.75;
+game.camera.x += 6;
+ori = true;
+move = true
+if (facing != 'right'){
+player.animations.play('right');
+player.scale.x = 1;
+facing = 'right';
+}
+
+}
+//Animacion izquierda
+else if (cursors.left.isDown){
+ori = false;
+move = true
+player.body.velocity.x = -250;
+bg.tilePosition.x += 0.003; 
+bg2.tilePosition.x += 0.005; 
+bg3.tilePosition.x += 0.008; 
+bg4.tilePosition.x += 0.012; 
+game.camera.x -= 6;
+if (facing != 'left'){  
+player.animations.play('left');
+facing = 'left';
+}
+}
+
+
+
+
+else{
+if (facing != 'idle'){
+player.animations.stop();
+
+if (facing == 'left'){
+player.animations.play('idle_left');
+move = false
+}
+else if (facing == 'right'){
+player.animations.play('idle_right');
+move = false
+}
+facing = 'idle';
+}
+}
+
+//Para disparar
+if (game.input.keyboard.isDown(Phaser.Keyboard.SPACEBAR)){
+fireBullet();
+}
+
+//if (jumpButton.isDown && (player.body.onFloor() || player.body.touching.down)){
+//player.body.velocity.y = -600;
+//player.animations.play('jump_right');
+//}
+if (cursors.up.isDown&& (player.body.onFloor() || player.body.touching.down)){
+player.body.velocity.y = -600;
+//player.animations.play('jump_right');
+if (ori){
+player.animations.play('jump_right');
+
+}else{
+player.animations.play('jump_left');
+}
+}
+
+
+}
+
+
+//Funcion de dispara
+function fireBullet () {
+if (game.time.now > bulletTime){
+
+bullet = bullets.getFirstExists(false);
+
+if (bullet){
+
+if(ori == true){
+bullet.reset(player.x+100 , player.y +50);
+if(move){player.animations.play('rightt_dis');}else{player.animations.play('idle_right_dis');}
+bullet.body.velocity.x = 400;
+//bullet.body.rotation+=tiempo_acha
+}
+if(ori ==  false){
+bullet.reset(player.x-28 , player.y +50);
+if(move){player.animations.play('leftt_dis');}else{player.animations.play('idle_left_dis');}
+bullet.body.velocity.x = -400;
+}
+bulletTime = game.time.now + 1000;
+}
+bullet.body.velocity.y = 10;
+}
+
+}
+
+//  Called if the bullet goes out of the screen
+function resetBullet (bullet) {
+bullet.kill();
+}
+
+
+
+function killplayer (player, enemysnake){
+player.position.x = 10;
+player.position.y = 1000;
+game.state.restart();
+losee.play();
+record=0;
+}
+
+function collectcoin (player, coins) {
+coinsoundd.play();
+coins.kill();
+record++;
+text.text = "Puntaje: "+record;
+if(record == 5){
+musicprin.pause();
+winn.play();
+}
+
+}
+
+function killenemy (bullet, enemysnake){
+killsnakes.play();
+enemysnake.kill();
+bullet.kill();
+}
+
+
+
+
+function render() {
+game.debug.spriteCoords(player,32,500);
+}
+    </script>
+  </body>
+</html>
